@@ -1,8 +1,22 @@
 <?php
-//header('Content-type: text/plain');
+include "credentials.php";
 
-//init_weekly_schedule("kuchnia");
-//echo "Zakończono inicjalizację harmonogramu tygodniowego dla kuchnia";
+header('Content-type: text/plain');
+
+
+
+if(!isset($_GET["sernum"])) {
+    echo "Podaj parameter sernum aby zainicalizować tempmetr WI-FI!";
+}
+else { 
+    $r = init_weekly_schedule($_GET["sernum"]);
+    if($r) {
+	echo "Zakończono inicjalizację harmonogramu tygodniowego dla ". $_GET["sernum"];
+    }
+    else {
+	echo "Coś poszło nie tak";
+    }
+}
 
 function insert_new_device($link, $params) {
 	if (!($stmt = $link->prepare("INSERT INTO serial_numbers(sernum, url, mac, smart_plug_url, smart_plug_user_pass, smart_plug_mac, enabled, smart_plug_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"))) {
@@ -51,12 +65,12 @@ function update_device($link, $params) {
 }
 
 function delete_device($link, $params) {
-	if (!($stmt = $link->prepare("delete from serial_numbers where sernum=?"))) {
+	if (!($stmt = $link->prepare("delete from temperature_schedule_weekly where sernum=?"))) {
 		echo "Prepare failed: (" . $link->errno . ") " . $link->error;
 		return;
 	}
 
-	if(!$stmt->bind_param('s', $params["sernum"] )) {
+	if(!$stmt->bind_param('s', $params )) {
 		echo "Binding parameters failed: (" . $stmt->errno . ") " . $stmt->error;
 		$stmt->close();
 		return;
@@ -68,10 +82,10 @@ function delete_device($link, $params) {
 		return;
 	}
 	$stmt->close();
-	echo "DELETE OK";
+	echo "DELETE old schedule OK\n";
 }
 
-function init_weekly_schedule($link, $sernum) {
+function init_weekly_schedule($sernum) {
 	$curve_data1 = array();
 
 	$curve_data1[] = array('00:00:00',21.0);
@@ -123,13 +137,14 @@ function init_weekly_schedule($link, $sernum) {
 	$curve_data1[] = array('23:00:00',21.0);
 	$curve_data1[] = array('23:59:59',21.0);
 
-	/*
+	
 	$link = new mysqli($GLOBALS['dbhost_name'], $GLOBALS['dbuser'], $GLOBALS['dbpasswd'], $GLOBALS['database'], $GLOBALS['dbport']);
 	if ($link->connect_errno) {
 		die( "Failed to connect to MySQL: (" . $link->connect_errno . ") " . $link->connect_error);
 	}
-	*/
-
+	
+   try {
+        delete_device($link, $sernum);
 	if (!($stmt = $link->prepare("INSERT INTO temperature_schedule_weekly(user_id,sernum,min_temp,max_temp,start_time,stop_time,weekday)
 									VALUES (3, ?, ?, ?, ?, ?, ?)"))) {
 		 echo "Prepare failed: (" . $link->errno . ") " . $link->error;
@@ -158,7 +173,11 @@ function init_weekly_schedule($link, $sernum) {
 			}
 		}
 	}
-
+  }
+    catch( Exception $e) {
+	echo "Error: " ,  $e->getMessage(), "\n";
+       return false; 
+   }
 	$stmt->close();
 	return true;
 }
